@@ -1,0 +1,6 @@
+opencv-python>=4.9
+rapidocr>=3.0
+onnxruntime>=1.18
+deep-translator>=1.11
+pillow>=10.0
+numpy>=1.26

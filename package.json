@@ -1,0 +1,12 @@
+{
+  "name": "video-text-translator",
+  "version": "0.1.0",
+  "description": "Detect hard-coded Chinese text in videos, translate it, and overlay the translation",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^44.6.0"
+  }
+}

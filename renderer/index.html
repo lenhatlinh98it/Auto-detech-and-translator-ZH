@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; media-src file:; img-src 'self' file: data:; style-src 'self' 'unsafe-inline'">
+  <title>Video Text Translator</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="toolbar">
+    <button id="btnOpen" class="primary">📂 Mở video</button>
+    <button id="btnAnalyze" disabled>🔍 Phân tích &amp; dịch</button>
+    <button id="btnPreview" disabled>👁 Xem thử khung hình</button>
+    <button id="btnPreviewVideo" disabled>🎬 Xem thử video</button>
+    <button id="btnApply" class="accent" disabled>✔ Apply &amp; xuất video</button>
+    <span class="spacer"></span>
+    <span id="saveState" class="muted"></span>
+    <button id="btnSettings">⚙ Cài đặt</button>
+  </header>
+
+  <div id="progressBar" class="progress hidden">
+    <div class="progress-fill" id="progressFill"></div>
+    <span id="progressText"></span>
+    <button id="btnCancel">Huỷ</button>
+  </div>
+
+  <main class="layout">
+    <section class="left">
+      <div id="empty" class="empty">
+        <p>Kéo thả video vào đây hoặc bấm <b>Mở video</b></p>
+        <p class="muted">Quy trình: Phân tích → chỉnh bản dịch trong danh sách → Apply</p>
+      </div>
+      <div id="stageWrap" class="hidden">
+        <div id="stage" class="stage">
+          <video id="video" preload="auto"></video>
+          <div id="overlay" class="overlay"></div>
+          <img id="previewImg" class="preview-img hidden" alt="">
+          <button id="btnClosePreview" class="close-preview hidden">✕ Đóng xem thử</button>
+        </div>
+        <div class="controls">
+          <button id="btnPlay">▶</button>
+          <button id="btnPrev" title="Lùi 1 frame">⏮</button>
+          <button id="btnNext" title="Tiến 1 frame">⏭</button>
+          <input id="seek" type="range" min="0" max="1000" value="0">
+          <span id="timeLabel" class="mono">0:00.000</span>
+          <button id="btnDraw" title="Kéo một khung trên video để thêm vùng chữ bị sót">➕ Thêm vùng</button>
+        </div>
+        <div id="timeline" class="timeline"><div id="playhead" class="playhead"></div></div>
+      </div>
+    </section>
+
+    <section class="right">
+      <div class="list-tools">
+        <input id="filter" type="search" placeholder="Tìm trong danh sách…">
+        <button id="btnRetransEmpty" title="Dịch các dòng đang trống">Dịch dòng trống</button>
+        <button id="btnRetransAll" title="Dịch lại toàn bộ (ghi đè bản dịch đã sửa)">Dịch lại tất cả</button>
+      </div>
+      <div class="list-tools">
+        <input id="findText" placeholder="Tìm (bản dịch)">
+        <input id="replaceText" placeholder="Thay bằng">
+        <button id="btnReplace">Thay tất cả</button>
+        <span id="count" class="muted"></span>
+      </div>
+      <div id="list" class="list"></div>
+    </section>
+  </main>
+
+  <dialog id="settingsDialog">
+    <form method="dialog" id="settingsForm">
+      <h3>Cài đặt</h3>
+      <div class="grid">
+        <label>Ngôn ngữ nguồn
+          <select id="setSource"><option value="zh-CN">Tiếng Trung (giản thể)</option><option value="zh-TW">Tiếng Trung (phồn thể)</option></select>
+        </label>
+        <label>Dịch sang
+          <select id="setTarget">
+            <option value="vi">Tiếng Việt</option><option value="en">English</option><option value="ja">日本語</option>
+            <option value="ko">한국어</option><option value="th">ไทย</option><option value="id">Indonesia</option>
+            <option value="fr">Français</option><option value="de">Deutsch</option><option value="es">Español</option>
+          </select>
+        </label>
+        <label>Engine dịch
+          <select id="setEngine"><option value="auto">Tự động (Google → MyMemory)</option><option value="google">Google</option><option value="mymemory">MyMemory</option></select>
+        </label>
+        <label>Tần suất quét (frame/giây)
+          <input id="setSampleFps" type="number" min="0.5" max="10" step="0.5">
+        </label>
+        <label>Ngưỡng tin cậy OCR
+          <input id="setMinScore" type="number" min="0.3" max="0.99" step="0.05">
+        </label>
+        <label>Gộp các dòng gần nhau
+          <select id="setMerge">
+            <option value="smart">Thông minh (cùng lúc xuất hiện + cùng kiểu)</option>
+            <option value="off">Không gộp (mỗi dòng 1 đoạn)</option>
+            <option value="loose">Gộp lỏng (chỉ theo khoảng cách)</option>
+          </select>
+        </label>
+        <label class="check"><input id="setOnlyCjk" type="checkbox"> Chỉ nhận chữ Trung (bỏ qua chữ khác)</label>
+        <label>Cách xoá chữ gốc
+          <select id="setErase"><option value="smart">Thông minh (chỉ xoá nét chữ)</option><option value="inpaint">Xoá cả khung (inpaint)</option><option value="box">Tô màu nền cả khung</option></select>
+        </label>
+        <label>Màu chữ mới
+          <select id="setTextColor"><option value="auto">Theo màu chữ gốc</option><option value="#ffffff">Trắng</option><option value="#ffe14d">Vàng</option><option value="#000000">Đen</option></select>
+        </label>
+        <label>Font (để trống = Segoe UI)
+          <span class="row"><input id="setFont" readonly placeholder="Mặc định"><button type="button" id="btnFont">Chọn…</button><button type="button" id="btnFontClear">✕</button></span>
+        </label>
+        <label>Thiết bị chạy OCR
+          <select id="setDevice">
+            <option value="auto">Tự động (GPU nếu có)</option>
+            <option value="cpu">CPU</option>
+            <option value="cuda">GPU NVIDIA (CUDA)</option>
+            <option value="dml">GPU bất kỳ (DirectML)</option>
+          </select>
+        </label>
+        <label>Bộ mã hoá video khi xuất
+          <select id="setEncoder">
+            <option value="libx264">CPU (libx264)</option>
+            <option value="h264_nvenc">GPU NVIDIA (NVENC)</option>
+            <option value="h264_qsv">GPU Intel (QuickSync)</option>
+            <option value="h264_amf">GPU AMD (AMF)</option>
+          </select>
+        </label>
+        <div class="block span2">
+          <button type="button" id="btnDevices">Kiểm tra GPU trên máy này</button>
+          <span id="devHint" class="muted"></span>
+        </div>
+        <label>Chất lượng xuất (CRF, nhỏ = đẹp)
+          <input id="setCrf" type="number" min="12" max="30">
+        </label>
+        <label>Tốc độ encode
+          <select id="setPreset"><option>veryfast</option><option>fast</option><option>medium</option><option>slow</option></select>
+        </label>
+      </div>
+      <label class="block">Từ điển (mỗi dòng: 中文=bản dịch) — dùng khi dịch tên riêng, thuật ngữ
+        <textarea id="setGlossary" rows="5" placeholder="例如: 小明=Tiểu Minh"></textarea>
+      </label>
+      <menu>
+        <button value="cancel">Đóng</button>
+        <button value="ok" class="primary" id="btnSettingsSave">Lưu</button>
+      </menu>
+    </form>
+  </dialog>
+
+  <dialog id="pvDialog" class="wide">
+    <h3>Xem thử video (đã xoá chữ gốc + chèn bản dịch, bản nhẹ 540p)</h3>
+    <div class="pv-opts">
+      <label>Từ giây <input id="pvStart" type="number" step="0.1" min="0"></label>
+      <label>Dài (giây) <input id="pvLen" type="number" step="1" min="1" value="10"></label>
+      <label class="check"><input id="pvAll" type="checkbox"> Toàn bộ video</label>
+      <button id="pvBuild" class="primary">Dựng &amp; phát</button>
+      <button id="pvCancel" class="hidden">Huỷ</button>
+      <span id="pvStatus" class="muted"></span>
+    </div>
+    <video id="pvVideo" controls></video>
+    <menu><button id="pvClose">Đóng</button></menu>
+  </dialog>
+
+  <script src="renderer.js"></script>
+</body>
+</html>
